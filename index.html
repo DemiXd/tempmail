@@ -435,7 +435,7 @@ function renderAll(){renderInbox();renderEmails();renderPasswordsPage();renderHi
 
 // ── EMAILS ───────────────────────────────────────────────────────────────
 async function createEmail(){hap('medium');const btn=document.getElementById('create-btn');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;
-  let email,login,domain;const data=await api('https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=1');
+  let email,login,domain;const data=await api('http://159.195.29.181:8080/api??action=genRandomMailbox&count=1');
   if(data?.[0]){email=data[0];[login,domain]=email.split('@');}else{login=rnd(10);domain=DOMAINS[Math.floor(Math.random()*DOMAINS.length)];email=`${login}@${domain}`;}
   const entry={email,login,domain,created:Date.now(),pwd:null};
   S.emails.push(entry);S.active=email;S.messages[email]=[];S.seen[email]=[];S.unlocked[email]=true;S.accounts[email]=[];
@@ -566,14 +566,14 @@ function unlockInbox(email){pendUnlock=email;document.getElementById('unlock-inp
 function switchInbox(email){const entry=S.emails.find(e=>e.email===email);if(entry?.pwd&&!S.unlocked[email]){unlockInbox(email);return;}S.active=email;sv();hap('light');renderInbox();}
 
 async function refreshInbox(){if(!S.active)return;hap('light');const entry=S.emails.find(e=>e.email===S.active);if(!entry)return;
-  const data=await api(`https://www.1secmail.com/api/v1/?action=getMessages&login=${entry.login}&domain=${entry.domain}`);
+  const data=await api(`http://159.195.29.181:8080/api??action=getMessages&login=${entry.login}&domain=${entry.domain}`);
   if(!data){toast('Ошибка подключения');return;}
   const prev=S.seen[S.active]||[];const nw=data.filter(m=>!prev.includes(m.id));
   S.messages[S.active]=data;if(nw.length&&S.settings.notify){hap('success');toast(`📬 ${nw.length} новых писем!`);}sv();renderInbox();}
 
 async function openMsg(email,id){hap('light');const entry=S.emails.find(e=>e.email===email);if(!entry)return;
   document.getElementById('det-subj').textContent='Загрузка…';document.getElementById('det-meta').textContent='';document.getElementById('det-body').textContent='';openOv('msg-overlay');
-  const msg=await api(`https://www.1secmail.com/api/v1/?action=readMessage&login=${entry.login}&domain=${entry.domain}&id=${id}`);
+  const msg=await api(`http://159.195.29.181:8080/api??action=readMessage&login=${entry.login}&domain=${entry.domain}&id=${id}`);
   if(!msg){document.getElementById('det-subj').textContent='Ошибка';return;}
   if(!S.seen[email])S.seen[email]=[];if(!S.seen[email].includes(id))S.seen[email].push(id);sv();
   document.getElementById('det-subj').textContent=msg.subject||'(без темы)';
