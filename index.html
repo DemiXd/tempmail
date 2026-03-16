@@ -369,7 +369,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <script>
 const tg=window.Telegram?.WebApp;
 if(tg){tg.ready();tg.expand();}
-const DOMAINS=['1secmail.com','1secmail.net','1secmail.org','wwjmp.com','esiix.com'];
+const PROXY='http://159.195.29.181:8080';
 const COLORS=['#007aff','#34c759','#ff9500','#af52de','#ff3b30','#5ac8fa','#ff6b35'];
 
 const SERVICES=[
@@ -435,9 +435,10 @@ function renderAll(){renderInbox();renderEmails();renderPasswordsPage();renderHi
 
 // ── EMAILS ───────────────────────────────────────────────────────────────
 async function createEmail(){hap('medium');const btn=document.getElementById('create-btn');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;
-  let email,login,domain;const data=await api('http://159.195.29.181:8080/api??action=genRandomMailbox&count=1');
-  if(data?.[0]){email=data[0];[login,domain]=email.split('@');}else{login=rnd(10);domain=DOMAINS[Math.floor(Math.random()*DOMAINS.length)];email=`${login}@${domain}`;}
-  const entry={email,login,domain,created:Date.now(),pwd:null};
+  const data=await api(PROXY+'/get_email');
+  if(!data||!data.email_addr){toast('Ошибка создания почты');btn.innerHTML='+ Создать новую почту';btn.disabled=false;return;}
+  const email=data.email_addr;const sid=data.sid_token;const seq=0;
+  const entry={email,sid,seq,created:Date.now(),pwd:null};
   S.emails.push(entry);S.active=email;S.messages[email]=[];S.seen[email]=[];S.unlocked[email]=true;S.accounts[email]=[];
   if(S.settings.history)S.history.unshift({email,created:entry.created});sv();
   btn.innerHTML='+ Создать новую почту';btn.disabled=false;hap('success');toast('✓ Почта создана');renderEmails();renderInbox();goPage('inbox');}
@@ -566,19 +567,22 @@ function unlockInbox(email){pendUnlock=email;document.getElementById('unlock-inp
 function switchInbox(email){const entry=S.emails.find(e=>e.email===email);if(entry?.pwd&&!S.unlocked[email]){unlockInbox(email);return;}S.active=email;sv();hap('light');renderInbox();}
 
 async function refreshInbox(){if(!S.active)return;hap('light');const entry=S.emails.find(e=>e.email===S.active);if(!entry)return;
-  const data=await api(`http://159.195.29.181:8080/api??action=getMessages&login=${entry.login}&domain=${entry.domain}`);
+  const data=await api(`${PROXY}/check_email?seq=${entry.seq||0}&sid=${entry.sid||''}`);
   if(!data){toast('Ошибка подключения');return;}
-  const prev=S.seen[S.active]||[];const nw=data.filter(m=>!prev.includes(m.id));
-  S.messages[S.active]=data;if(nw.length&&S.settings.notify){hap('success');toast(`📬 ${nw.length} новых писем!`);}sv();renderInbox();}
+  const msgs=(data.list||[]).map(m=>({id:m.mail_id,from:m.mail_from,subject:m.mail_subject,date:m.mail_date}));
+  const prev=S.seen[S.active]||[];const nw=msgs.filter(m=>!prev.includes(m.id));
+  S.messages[S.active]=msgs;
+  if(nw.length&&S.settings.notify){hap('success');toast(`📬 ${nw.length} новых писем!`);}
+  sv();renderInbox();}
 
 async function openMsg(email,id){hap('light');const entry=S.emails.find(e=>e.email===email);if(!entry)return;
   document.getElementById('det-subj').textContent='Загрузка…';document.getElementById('det-meta').textContent='';document.getElementById('det-body').textContent='';openOv('msg-overlay');
-  const msg=await api(`http://159.195.29.181:8080/api??action=readMessage&login=${entry.login}&domain=${entry.domain}&id=${id}`);
+  const msg=await api(`${PROXY}/get_msg?id=${id}&sid=${entry.sid||''}`);
   if(!msg){document.getElementById('det-subj').textContent='Ошибка';return;}
   if(!S.seen[email])S.seen[email]=[];if(!S.seen[email].includes(id))S.seen[email].push(id);sv();
-  document.getElementById('det-subj').textContent=msg.subject||'(без темы)';
-  document.getElementById('det-meta').innerHTML=`От: ${esc(msg.from||'?')}<br>Дата: ${esc(msg.date||'')}`;
-  const body=msg.textBody||msg.body||'(пустое письмо)';document.getElementById('det-body').textContent=body.length>4000?body.substring(0,4000)+'…':body;
+  document.getElementById('det-subj').textContent=msg.mail_subject||'(без темы)';
+  document.getElementById('det-meta').innerHTML=`От: ${esc(msg.mail_from||'?')}<br>Дата: ${esc(msg.mail_date||'')}`;
+  const body=msg.mail_body||msg.mail_excerpt||'(пустое письмо)';document.getElementById('det-body').textContent=body.length>4000?body.substring(0,4000)+'…':body;
   renderInbox();}
 
 // ── HISTORY ──────────────────────────────────────────────────────────────
