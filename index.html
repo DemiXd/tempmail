@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Temp Mail</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:var(--tg-theme-bg-color,#fff);
+  --bg2:var(--tg-theme-secondary-bg-color,#f2f2f7);
+  --text:var(--tg-theme-text-color,#000);
+  --hint:var(--tg-theme-hint-color,#8e8e93);
+  --link:var(--tg-theme-link-color,#007aff);
+  --btn:var(--tg-theme-button-color,#007aff);
+  --btnT:var(--tg-theme-button-text-color,#fff);
+  --r:12px;--red:#ff3b30;--green:#34c759;--orange:#ff9500;--purple:#af52de;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* PIN */
+#pin-screen{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px}
+#pin-screen.hidden{display:none}
+.pin-icon{width:64px;height:64px;border-radius:20px;background:var(--btn);display:flex;align-items:center;justify-content:center;margin-bottom:24px}
+.pin-icon svg{width:32px;height:32px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pin-title{font-size:22px;font-weight:700;margin-bottom:6px;text-align:center}
+.pin-sub{font-size:14px;color:var(--hint);margin-bottom:32px;text-align:center;max-width:260px;line-height:1.5}
+.pin-dots{display:flex;gap:16px;margin-bottom:40px}
+.pin-dot{width:16px;height:16px;border-radius:50%;background:var(--bg2);border:2px solid var(--hint);transition:all .15s}
+.pin-dot.filled{background:var(--btn);border-color:var(--btn)}
+.pin-dot.error{background:var(--red);border-color:var(--red)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;max-width:280px}
+.pin-key{height:64px;border-radius:var(--r);border:none;background:var(--bg2);color:var(--text);font-size:24px;font-weight:500;cursor:pointer;transition:opacity .1s;display:flex;align-items:center;justify-content:center}
+.pin-key:active{opacity:.5}
+.pin-key.empty{background:transparent;cursor:default;font-size:13px;color:var(--hint)}
+.pin-link{font-size:14px;color:var(--link);background:none;border:none;cursor:pointer;padding:12px 16px;margin-top:8px}
+
+/* LAYOUT */
+.nav{display:flex;background:var(--bg2);border-top:.5px solid rgba(0,0,0,.12);position:fixed;bottom:0;left:0;right:0;z-index:50;padding-bottom:env(safe-area-inset-bottom)}
+.nav-btn{flex:1;padding:8px 4px 6px;font-size:10px;font-weight:500;border:none;background:none;color:var(--hint);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:color .15s}
+.nav-btn svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-btn.active{color:var(--btn)}
+.nav-iw{position:relative;width:24px;height:24px}
+.nav-badge{position:absolute;top:-3px;right:-5px;min-width:16px;height:16px;border-radius:8px;background:var(--red);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px}
+.app{padding-bottom:calc(62px + env(safe-area-inset-bottom))}
+.page{display:none;padding:16px}
+.page.active{display:block}
+
+/* COMPONENTS */
+.btn{width:100%;padding:14px;border:none;border-radius:var(--r);background:var(--btn);color:var(--btnT);font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s;margin-bottom:10px;display:block;text-align:center}
+.btn:active{opacity:.75}
+.btn.sec{background:var(--bg2);color:var(--text)}
+.btn.danger{background:rgba(255,59,48,.1);color:var(--red)}
+.btn.sm{padding:8px 14px;font-size:13px;width:auto;margin:0;border-radius:8px;display:inline-block}
+.btn.xs{padding:6px 10px;font-size:12px;width:auto;margin:0;border-radius:8px;display:inline-block}
+.toggle{width:44px;height:26px;border-radius:13px;background:#ccc;position:relative;cursor:pointer;transition:background .2s;border:none;flex-shrink:0}
+.toggle.on{background:var(--green)}
+.toggle::after{content:'';position:absolute;width:22px;height:22px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.toggle.on::after{transform:translateX(18px)}
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap}
+.badge-green{background:rgba(52,199,89,.12);color:var(--green)}
+.badge-orange{background:rgba(255,149,0,.15);color:var(--orange)}
+.badge-purple{background:rgba(175,82,222,.12);color:var(--purple)}
+.badge-gray{background:rgba(0,0,0,.06);color:var(--hint)}
+.spinner{width:18px;height:18px;border:2px solid rgba(0,0,0,.1);border-top-color:var(--btn);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:40px 20px;color:var(--hint)}
+.empty svg{width:48px;height:48px;stroke:var(--hint);fill:none;margin-bottom:12px;opacity:.4;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
+.empty h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:5px}
+.empty p{font-size:13px;line-height:1.5}
+.toast{position:fixed;bottom:calc(72px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(10px);background:rgba(0,0,0,.78);color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;opacity:0;transition:all .2s;pointer-events:none;white-space:nowrap;z-index:900}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.sec-title{font-size:12px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.5px;padding:0 4px;margin-bottom:8px;margin-top:16px}
+.sec-title:first-child{margin-top:0}
+.card{background:var(--bg2);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
+.srow{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:.5px solid rgba(0,0,0,.06)}
+.srow:last-child{border-bottom:none}
+.srow-l{font-size:15px}
+.srow-s{font-size:12px;color:var(--hint);margin-top:2px}
+.err{color:var(--red);font-size:13px;margin-bottom:10px}
+
+/* OVERLAYS */
+.overlay{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1)}
+.overlay.open{transform:translateX(0)}
+.ov-hd{padding:16px;border-bottom:.5px solid rgba(0,0,0,.08);flex-shrink:0;background:var(--bg)}
+.back-btn{display:flex;align-items:center;gap:6px;color:var(--link);font-size:15px;background:none;border:none;cursor:pointer;padding:0;margin-bottom:12px}
+.back-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.ov-title{font-size:20px;font-weight:700}
+.ov-sub{font-size:13px;color:var(--hint);margin-top:3px;font-family:monospace}
+.ov-scroll{flex:1;overflow-y:auto;padding:16px}
+
+/* MSG DETAIL */
+.ov-subj{font-size:18px;font-weight:700;line-height:1.3;margin-bottom:6px}
+.ov-meta{font-size:13px;color:var(--hint);line-height:1.7}
+.ov-body{flex:1;overflow-y:auto;padding:16px;font-size:14px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+
+/* INBOX */
+.etabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;scrollbar-width:none}
+.etabs::-webkit-scrollbar{display:none}
+.etab{flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:13px;font-weight:500;cursor:pointer;background:var(--bg2);color:var(--hint);border:1.5px solid transparent;transition:all .15s;white-space:nowrap}
+.etab.active{border-color:var(--btn);color:var(--btn);background:rgba(0,122,255,.08)}
+.ndot{width:7px;height:7px;border-radius:50%;background:var(--red);display:inline-block;margin-left:4px;vertical-align:middle}
+.msg-list{background:var(--bg2);border-radius:var(--r);overflow:hidden}
+.msg-item{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-bottom:.5px solid rgba(0,0,0,.06);cursor:pointer;transition:background .1s}
+.msg-item:last-child{border-bottom:none}
+.msg-item:active{background:rgba(0,0,0,.04)}
+.msg-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0}
+.msg-info{flex:1;min-width:0}
+.msg-from{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg-subj{font-size:13px;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.msg-date{font-size:11px;color:var(--hint);margin-top:3px}
+.inbox-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px}
+.inbox-addr{font-size:12px;font-family:monospace;color:var(--hint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.ref-btn{width:32px;height:32px;border-radius:50%;border:none;background:var(--bg2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.ref-btn svg{width:16px;height:16px;stroke:var(--hint);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.auto-bar{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--hint);margin-top:10px;padding:8px 12px;background:var(--bg2);border-radius:8px}
+
+/* EMAIL CARDS */
+.ecard{background:var(--bg2);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
+.eaddr-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.eaddr{flex:1;font-size:14px;font-family:monospace;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.eacts{display:flex;gap:6px;flex-wrap:wrap}
+.eacts .btn{flex:1;min-width:70px;padding:9px;font-size:12px;margin:0}
+.eacts .btn.accent{background:rgba(175,82,222,.12);color:var(--purple);border:none}
+
+/* PASSWORD MANAGER */
+.pwd-list{display:flex;flex-direction:column;gap:10px}
+.pwd-card{background:var(--bg);border:.5px solid rgba(0,0,0,.1);border-radius:var(--r);padding:14px 16px}
+.pwd-service-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.service-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;background:var(--bg2)}
+.pwd-service-name{font-size:16px;font-weight:700;flex:1}
+.pwd-field{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:.5px solid rgba(0,0,0,.06)}
+.pwd-field:last-child{border-bottom:none}
+.pwd-field-label{font-size:12px;color:var(--hint);width:56px;flex-shrink:0}
+.pwd-field-val{flex:1;font-size:14px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pwd-field-val.hidden{letter-spacing:3px;font-size:16px}
+.pwd-copy-btn{width:28px;height:28px;border-radius:8px;border:none;background:rgba(0,122,255,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-left:6px}
+.pwd-copy-btn svg{width:14px;height:14px;stroke:var(--btn);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pwd-eye-btn{width:28px;height:28px;border-radius:8px;border:none;background:var(--bg2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-left:4px}
+.pwd-eye-btn svg{width:14px;height:14px;stroke:var(--hint);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pwd-card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:.5px solid rgba(0,0,0,.06)}
+.pwd-date{font-size:11px;color:var(--hint)}
+.pwd-note{font-size:12px;color:var(--hint);margin-top:6px;font-style:italic;padding:6px 8px;background:var(--bg2);border-radius:8px;line-height:1.4}
+.add-pwd-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border-radius:var(--r);border:1.5px dashed rgba(175,82,222,.4);background:rgba(175,82,222,.05);color:var(--purple);font-size:14px;font-weight:600;cursor:pointer;width:100%;margin-bottom:12px;transition:background .15s}
+.add-pwd-btn:active{background:rgba(175,82,222,.12)}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-bg.open{opacity:1;pointer-events:all}
+.modal{background:var(--bg);border-radius:20px 20px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom));width:100%;max-width:500px;transform:translateY(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);max-height:90vh;overflow-y:auto}
+.modal-bg.open .modal{transform:translateY(0)}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:6px}
+.modal p{font-size:14px;color:var(--hint);margin-bottom:16px;line-height:1.5}
+.inp{width:100%;padding:13px 14px;border:.5px solid rgba(0,0,0,.15);border-radius:10px;font-size:15px;background:var(--bg2);color:var(--text);margin-bottom:10px;outline:none;-webkit-appearance:none}
+.inp:focus{border-color:var(--btn)}
+.inp-row{position:relative;margin-bottom:10px}
+.inp-row .inp{margin-bottom:0;padding-right:44px}
+.inp-row .eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;color:var(--hint)}
+.inp-row .eye svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.inp-label{font-size:12px;color:var(--hint);margin-bottom:5px;margin-left:2px;font-weight:500}
+.service-emojis{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.semoji{width:40px;height:40px;border-radius:10px;border:1.5px solid transparent;background:var(--bg2);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .1s}
+.semoji.active{border-color:var(--btn);background:rgba(0,122,255,.1)}
+
+/* HISTORY */
+.hist-row{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:.5px solid rgba(0,0,0,.06)}
+.hist-row:last-child{border-bottom:none}
+.hist-addr{flex:1;font-size:13px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-date{font-size:11px;color:var(--hint)}
+</style>
+</head>
+<body>
+
+<!-- PIN SCREEN -->
+<div id="pin-screen">
+  <div class="pin-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+  <div class="pin-title" id="pin-title">Введи PIN</div>
+  <div class="pin-sub" id="pin-sub">Доступ к Temp Mail</div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div>
+  </div>
+  <div class="pin-pad">
+    <button class="pin-key" onclick="pinKey('1')">1</button>
+    <button class="pin-key" onclick="pinKey('2')">2</button>
+    <button class="pin-key" onclick="pinKey('3')">3</button>
+    <button class="pin-key" onclick="pinKey('4')">4</button>
+    <button class="pin-key" onclick="pinKey('5')">5</button>
+    <button class="pin-key" onclick="pinKey('6')">6</button>
+    <button class="pin-key" onclick="pinKey('7')">7</button>
+    <button class="pin-key" onclick="pinKey('8')">8</button>
+    <button class="pin-key" onclick="pinKey('9')">9</button>
+    <button class="pin-key empty" id="pin-skip" onclick="pinSkip()"></button>
+    <button class="pin-key" onclick="pinKey('0')">0</button>
+    <button class="pin-key" onclick="pinDel()">⌫</button>
+  </div>
+  <button class="pin-link" id="pin-reset" style="display:none" onclick="resetPIN()">Сбросить PIN</button>
+</div>
+
+<!-- MAIN APP -->
+<div class="app" id="main-app" style="display:none">
+  <nav class="nav">
+    <button class="nav-btn active" onclick="goPage('inbox')" id="nav-inbox">
+      <div class="nav-iw"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      <span class="nav-badge" id="inbox-badge" style="display:none">0</span></div>Входящие
+    </button>
+    <button class="nav-btn" onclick="goPage('emails')" id="nav-emails">
+      <div class="nav-iw"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M9 21V9"/></svg></div>Почты
+    </button>
+    <button class="nav-btn" onclick="goPage('passwords')" id="nav-passwords">
+      <div class="nav-iw"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>
+      <span class="nav-badge" id="pwd-count-badge" style="display:none">0</span></div>Пароли
+    </button>
+    <button class="nav-btn" onclick="goPage('history')" id="nav-history">
+      <div class="nav-iw"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>История
+    </button>
+    <button class="nav-btn" onclick="goPage('settings')" id="nav-settings">
+      <div class="nav-iw"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>Настройки
+    </button>
+  </nav>
+
+  <!-- INBOX -->
+  <div class="page active" id="page-inbox">
+    <div id="etabs-wrap" style="display:none"><div class="etabs" id="etabs"></div></div>
+    <div class="inbox-hd">
+      <div class="inbox-addr" id="inbox-addr">Нет активной почты</div>
+      <button class="ref-btn" onclick="refreshInbox()"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+    </div>
+    <div id="inbox-content"></div>
+    <div class="auto-bar" id="auto-bar" style="display:none">
+      <span>Автообновление</span>
+      <span id="auto-cd" style="font-weight:600;color:var(--text)">15с</span>
+    </div>
+  </div>
+
+  <!-- EMAILS -->
+  <div class="page" id="page-emails">
+    <button class="btn" id="create-btn" onclick="createEmail()">+ Создать новую почту</button>
+    <div id="emails-list"></div>
+  </div>
+
+  <!-- PASSWORDS -->
+  <div class="page" id="page-passwords">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <span style="font-size:17px;font-weight:700">Менеджер паролей</span>
+    </div>
+    <div id="pwd-email-select" style="margin-bottom:14px"></div>
+    <div id="pwd-page-content"></div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="page" id="page-history">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-size:17px;font-weight:700">История</span>
+      <button class="btn sec sm" onclick="clearHistory()">Очистить</button>
+    </div>
+    <div id="history-list"></div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="page" id="page-settings">
+    <p class="sec-title">Безопасность</p>
+    <div class="card">
+      <div class="srow"><div><div class="srow-l">PIN-защита</div><div class="srow-s" id="pin-st">Не установлен</div></div>
+        <button class="btn sec sm" id="pin-act-btn" onclick="openPinSetup()">Установить</button></div>
+      <div class="srow" id="chg-pin-row" style="display:none"><div><div class="srow-l">Изменить PIN</div></div>
+        <button class="btn sec sm" onclick="changePINFlow()">Изменить</button></div>
+    </div>
+    <p class="sec-title">Уведомления</p>
+    <div class="card">
+      <div class="srow"><div><div class="srow-l">Новые письма</div><div class="srow-s">Уведомлять о приходе</div></div><button class="toggle" id="t-notify" onclick="tog('notify')"></button></div>
+      <div class="srow"><div><div class="srow-l">Автообновление</div><div class="srow-s">Каждые 15 сек</div></div><button class="toggle" id="t-auto" onclick="tog('auto')"></button></div>
+    </div>
+    <p class="sec-title">Интерфейс</p>
+    <div class="card">
+      <div class="srow"><div><div class="srow-l">Вибрация</div></div><button class="toggle" id="t-haptic" onclick="tog('haptic')"></button></div>
+      <div class="srow"><div><div class="srow-l">Сохранять историю</div></div><button class="toggle" id="t-history" onclick="tog('history')"></button></div>
+    </div>
+    <p class="sec-title">Данные</p>
+    <button class="btn danger" onclick="nukeAll()">Удалить всё и сбросить</button>
+  </div>
+</div>
+
+<!-- MSG DETAIL OVERLAY -->
+<div class="overlay" id="msg-overlay">
+  <div class="ov-hd">
+    <button class="back-btn" onclick="closeOv('msg-overlay')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>Назад</button>
+    <div class="ov-subj" id="det-subj"></div>
+    <div class="ov-meta" id="det-meta"></div>
+  </div>
+  <div class="ov-body" id="det-body"></div>
+</div>
+
+<!-- PASSWORDS LIST OVERLAY (per email) -->
+<div class="overlay" id="pwd-list-overlay">
+  <div class="ov-hd">
+    <button class="back-btn" onclick="closeOv('pwd-list-overlay')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>Назад</button>
+    <div class="ov-title">Пароли</div>
+    <div class="ov-sub" id="pwd-ov-addr"></div>
+  </div>
+  <div class="ov-scroll" id="pwd-ov-content"></div>
+</div>
+
+<!-- ADD / EDIT PASSWORD MODAL -->
+<div class="modal-bg" id="add-pwd-modal">
+  <div class="modal">
+    <h3 id="add-pwd-title">Добавить аккаунт</h3>
+    <p id="add-pwd-sub">Сохрани логин и пароль для этой почты</p>
+
+    <div class="inp-label">Сервис</div>
+    <div class="inp" id="service-display" onclick="openServicePicker()" style="cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--text)">
+      <span id="service-emoji-preview">🌐</span>
+      <span id="service-name-preview" style="flex:1;color:var(--hint)">Выбери или введи название</span>
+    </div>
+
+    <div class="inp-label" style="margin-top:4px">Логин / никнейм</div>
+    <input class="inp" id="acc-login" placeholder="username или email" autocomplete="off" spellcheck="false">
+
+    <div class="inp-label">Пароль</div>
+    <input class="inp" id="acc-pwd" type="text" placeholder="Пароль от аккаунта" autocomplete="off" spellcheck="false">
+
+    <div class="inp-label">Заметка (необязательно)</div>
+    <input class="inp" id="acc-note" placeholder="Любая доп. информация" autocomplete="off">
+
+    <div class="err" id="add-pwd-err" style="display:none"></div>
+    <button class="btn" onclick="saveAccount()">Сохранить</button>
+    <button class="btn sec" onclick="closeM('add-pwd-modal')">Отмена</button>
+  </div>
+</div>
+
+<!-- SERVICE PICKER MODAL -->
+<div class="modal-bg" id="service-modal">
+  <div class="modal">
+    <h3>Выбери сервис</h3>
+    <input class="inp" id="service-search" placeholder="Поиск или введи своё название" oninput="filterServices()" autocomplete="off">
+    <div class="service-emojis" id="service-grid"></div>
+    <button class="btn sec" onclick="closeM('service-modal')">Готово</button>
+  </div>
+</div>
+
+<!-- UNLOCK MODAL -->
+<div class="modal-bg" id="unlock-modal">
+  <div class="modal">
+    <h3>🔒 Почта защищена</h3>
+    <p>Введи пароль чтобы открыть</p>
+    <input class="inp" type="password" id="unlock-inp" placeholder="Пароль" maxlength="32">
+    <div class="err" id="unlock-err" style="display:none">Неверный пароль</div>
+    <button class="btn" onclick="doUnlock()">Открыть</button>
+    <button class="btn sec" onclick="closeM('unlock-modal')">Отмена</button>
+  </div>
+</div>
+
+<!-- EMAIL PASSWORD MODAL -->
+<div class="modal-bg" id="epwd-modal">
+  <div class="modal">
+    <h3 id="epwd-title">Пароль на почту</h3>
+    <p id="epwd-sub">Защити почту паролем</p>
+    <input class="inp" type="password" id="epwd1" placeholder="Пароль" maxlength="32">
+    <input class="inp" type="password" id="epwd2" placeholder="Повтори пароль" maxlength="32">
+    <div class="err" id="epwd-err" style="display:none"></div>
+    <button class="btn" onclick="saveEmailPwd()">Сохранить</button>
+    <button class="btn sec" onclick="closeM('epwd-modal')">Отмена</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand();}
+const DOMAINS=['1secmail.com','1secmail.net','1secmail.org','wwjmp.com','esiix.com'];
+const COLORS=['#007aff','#34c759','#ff9500','#af52de','#ff3b30','#5ac8fa','#ff6b35'];
+
+const SERVICES=[
+  {n:'Discord',e:'🎮'},{n:'Steam',e:'🎯'},{n:'Telegram',e:'✈️'},{n:'Instagram',e:'📸'},
+  {n:'Twitter',e:'🐦'},{n:'TikTok',e:'🎵'},{n:'YouTube',e:'▶️'},{n:'Twitch',e:'🟣'},
+  {n:'Reddit',e:'🤖'},{n:'GitHub',e:'🐱'},{n:'Spotify',e:'🎧'},{n:'Netflix',e:'🎬'},
+  {n:'Amazon',e:'📦'},{n:'Google',e:'🔍'},{n:'Microsoft',e:'🪟'},{n:'Epic Games',e:'🎮'},
+  {n:'VK',e:'💙'},{n:'Avito',e:'🟢'},{n:'Ozon',e:'🔵'},{n:'Wildberries',e:'🍇'},
+  {n:'Другое',e:'🌐'}
+];
+
+let S={
+  emails:[],active:null,messages:{},seen:{},unlocked:{},
+  accounts:{},  // {email: [{id,service,emoji,login,pwd,note,created}]}
+  history:[],pin:null,
+  settings:{notify:true,auto:true,haptic:true,history:true}
+};
+function ld(){try{const s=localStorage.getItem('tm4');if(s)Object.assign(S,JSON.parse(s));}catch(e){}}
+function sv(){try{localStorage.setItem('tm4',JSON.stringify(S));}catch(e){}}
+ld();
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function hap(t='light'){if(!S.settings.haptic)return;try{tg?.HapticFeedback?.impactOccurred(t);}catch(e){}}
+function rnd(n){return Array.from({length:n},()=>'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random()*36)]).join('');}
+function hash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h)+s.charCodeAt(i);return String(h>>>0);}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+async function api(u){try{const r=await fetch(u);return await r.json();}catch(e){return null;}}
+let tT;function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>el.classList.remove('show'),2200);}
+function openOv(id){document.getElementById(id).classList.add('open');}
+function closeOv(id){document.getElementById(id).classList.remove('open');hap();}
+function openM(id){document.getElementById(id).classList.add('open');}
+function closeM(id){document.getElementById(id).classList.remove('open');}
+function copyText(t){try{navigator.clipboard.writeText(t);}catch(e){}toast('📋 Скопировано!');}
+function toggleEye(inputId,btn){const inp=document.getElementById(inputId);inp.type=inp.type==='password'?'text':'password';}
+
+// ── PIN ──────────────────────────────────────────────────────────────────
+let pinIn='',pinMode='enter',pinTmp='';
+function initPin(){
+  if(!S.pin){pinMode='setup1';document.getElementById('pin-title').textContent='Установи PIN';document.getElementById('pin-sub').textContent='Придумай 4-значный PIN для защиты';document.getElementById('pin-skip').textContent='Пропустить';showApp();return;}
+  pinMode='enter';document.getElementById('pin-title').textContent='Введи PIN';document.getElementById('pin-sub').textContent='Доступ к Temp Mail';document.getElementById('pin-skip').textContent='';document.getElementById('pin-reset').style.display='';
+}
+function pinKey(k){if(pinIn.length>=4)return;hap('light');pinIn+=k;updDots();if(pinIn.length===4)setTimeout(chkPin,80);}
+function pinDel(){hap('light');pinIn=pinIn.slice(0,-1);updDots();}
+function pinSkip(){hap('medium');pinIn='';updDots();showApp();}
+function updDots(st=''){for(let i=0;i<4;i++){const d=document.getElementById('d'+i);d.className='pin-dot'+(i<pinIn.length?' filled':'')+(st==='error'?' error':'');}}
+function chkPin(){
+  if(pinMode==='enter'){if(hash(pinIn)===S.pin){showApp();}else{updDots('error');hap('error');setTimeout(()=>{pinIn='';updDots();},700);}}
+  else if(pinMode==='setup1'){pinTmp=pinIn;pinIn='';updDots();document.getElementById('pin-title').textContent='Повтори PIN';document.getElementById('pin-sub').textContent='';document.getElementById('pin-skip').textContent='Отмена';pinMode='setup2';}
+  else if(pinMode==='setup2'){if(pinIn===pinTmp){S.pin=hash(pinIn);sv();hap('success');showApp();toast('✓ PIN установлен');}else{hap('error');updDots('error');setTimeout(()=>{pinIn='';pinTmp='';pinMode='setup1';document.getElementById('pin-title').textContent='Не совпало';document.getElementById('pin-sub').textContent='Введи заново';updDots();},700);}}
+  else if(pinMode==='change1'){if(hash(pinIn)===S.pin){pinTmp='';pinIn='';updDots();document.getElementById('pin-title').textContent='Новый PIN';document.getElementById('pin-sub').textContent='';pinMode='change2a';}else{hap('error');updDots('error');setTimeout(()=>{pinIn='';updDots();},700);}}
+  else if(pinMode==='change2a'){pinTmp=pinIn;pinIn='';updDots();document.getElementById('pin-title').textContent='Повтори новый PIN';document.getElementById('pin-sub').textContent='';pinMode='change2b';}
+  else if(pinMode==='change2b'){if(pinIn===pinTmp){S.pin=hash(pinIn);sv();hap('success');showApp();toast('✓ PIN изменён');}else{hap('error');updDots('error');setTimeout(()=>{pinIn='';pinTmp='';pinMode='change2a';document.getElementById('pin-title').textContent='Не совпало';document.getElementById('pin-sub').textContent='Введи новый PIN снова';updDots();},700);}}
+}
+function resetPIN(){S.pin=null;sv();showApp();toast('PIN сброшен');}
+function showApp(){document.getElementById('pin-screen').classList.add('hidden');document.getElementById('main-app').style.display='';renderAll();if(S.settings.auto)startAuto();if(S.active)refreshInbox();}
+function openPinSetup(){pinIn='';pinTmp='';pinMode='setup1';document.getElementById('pin-title').textContent='Установи PIN';document.getElementById('pin-sub').textContent='Введи 4-значный PIN';document.getElementById('pin-skip').textContent='Отмена';document.getElementById('pin-screen').classList.remove('hidden');document.getElementById('main-app').style.display='none';updDots();}
+function changePINFlow(){pinIn='';pinTmp='';pinMode='change1';document.getElementById('pin-title').textContent='Текущий PIN';document.getElementById('pin-sub').textContent='Введи текущий PIN';document.getElementById('pin-skip').textContent='Отмена';document.getElementById('pin-screen').classList.remove('hidden');document.getElementById('main-app').style.display='none';updDots();}
+
+// ── NAV ──────────────────────────────────────────────────────────────────
+function goPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById('page-'+id).classList.add('active');document.getElementById('nav-'+id).classList.add('active');hap('light');
+  if(id==='inbox')renderInbox();if(id==='emails')renderEmails();if(id==='passwords')renderPasswordsPage();if(id==='history')renderHistory();if(id==='settings')renderSettings();}
+function renderAll(){renderInbox();renderEmails();renderPasswordsPage();renderHistory();renderSettings();}
+
+// ── EMAILS ───────────────────────────────────────────────────────────────
+async function createEmail(){hap('medium');const btn=document.getElementById('create-btn');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;
+  let email,login,domain;const data=await api('https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=1');
+  if(data?.[0]){email=data[0];[login,domain]=email.split('@');}else{login=rnd(10);domain=DOMAINS[Math.floor(Math.random()*DOMAINS.length)];email=`${login}@${domain}`;}
+  const entry={email,login,domain,created:Date.now(),pwd:null};
+  S.emails.push(entry);S.active=email;S.messages[email]=[];S.seen[email]=[];S.unlocked[email]=true;S.accounts[email]=[];
+  if(S.settings.history)S.history.unshift({email,created:entry.created});sv();
+  btn.innerHTML='+ Создать новую почту';btn.disabled=false;hap('success');toast('✓ Почта создана');renderEmails();renderInbox();goPage('inbox');}
+
+function renderEmails(){const wrap=document.getElementById('emails-list');
+  if(!S.emails.length){wrap.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M9 21V9"/></svg><h3>Нет почт</h3><p>Нажми кнопку выше</p></div>';return;}
+  wrap.innerHTML=S.emails.map((e,i)=>{
+    const isAct=S.active===e.email;const locked=!!e.pwd;const accs=(S.accounts[e.email]||[]).length;
+    return`<div class="ecard"><div class="eaddr-row"><div class="eaddr">${esc(e.email)}</div>${isAct?'<span class="badge badge-green">Активна</span>':''}${locked?'<span class="badge badge-orange">🔒</span>':''}${accs>0?`<span class="badge badge-purple">🔑 ${accs}</span>`:''}</div>
+    <div class="eacts">${!isAct?`<button class="btn sec" onclick="setActive('${e.email}')">Выбрать</button>`:''}<button class="btn sec" onclick="copyAddr('${e.email}')">Копировать</button><button class="btn accent" onclick="openEmailPasswords('${e.email}')">🔑 Пароли</button><button class="btn sec" onclick="openEPwdM(${i})">${locked?'Замок ✓':'+ Замок'}</button><button class="btn sec" style="color:var(--red)" onclick="delEmail(${i})">Удалить</button></div></div>`;
+  }).join('');}
+
+function setActive(email){const entry=S.emails.find(e=>e.email===email);if(!entry)return;
+  if(entry.pwd&&!S.unlocked[email]){pendUnlock=email;document.getElementById('unlock-inp').value='';document.getElementById('unlock-err').style.display='none';openM('unlock-modal');return;}
+  S.active=email;sv();hap('light');toast('✓ Активная почта изменена');renderEmails();renderInbox();}
+function delEmail(i){hap('medium');const e=S.emails[i];S.emails.splice(i,1);if(!S.emails.length)S.active=null;else if(S.active===e.email)S.active=S.emails[0].email;sv();renderEmails();renderInbox();toast('Почта удалена');}
+function copyAddr(email){hap('light');copyText(email);}
+
+// email lock
+let epwdIdx=null;
+function openEPwdM(i){epwdIdx=i;const e=S.emails[i];document.getElementById('epwd-title').textContent=e.pwd?'Изменить замок':'Поставить замок';document.getElementById('epwd-sub').textContent='Пароль для открытия входящих';document.getElementById('epwd1').value='';document.getElementById('epwd2').value='';document.getElementById('epwd-err').style.display='none';openM('epwd-modal');}
+function saveEmailPwd(){const p1=document.getElementById('epwd1').value.trim(),p2=document.getElementById('epwd2').value.trim(),err=document.getElementById('epwd-err');
+  if(!p1){err.textContent='Введи пароль';err.style.display='';return;}if(p1!==p2){err.textContent='Пароли не совпадают';err.style.display='';return;}
+  S.emails[epwdIdx].pwd=hash(p1);S.unlocked[S.emails[epwdIdx].email]=true;sv();closeM('epwd-modal');hap('success');toast('✓ Замок установлен');renderEmails();}
+let pendUnlock=null;
+function doUnlock(){const p=document.getElementById('unlock-inp').value.trim();const entry=S.emails.find(e=>e.email===pendUnlock);if(!entry){closeM('unlock-modal');return;}
+  if(hash(p)===entry.pwd){S.unlocked[pendUnlock]=true;S.active=pendUnlock;sv();closeM('unlock-modal');hap('success');renderEmails();renderInbox();toast('✓ Разблокировано');}
+  else{document.getElementById('unlock-err').style.display='';hap('error');}}
+
+// ── PASSWORD MANAGER ─────────────────────────────────────────────────────
+let curPwdEmail=null;let editingAccId=null;let selService={n:'Другое',e:'🌐'};
+
+function renderPasswordsPage(){
+  const sel=document.getElementById('pwd-email-select');
+  const content=document.getElementById('pwd-page-content');
+  if(!S.emails.length){
+    sel.innerHTML='';content.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg><h3>Нет почт</h3><p>Сначала создай почту</p></div>';return;}
+  // email selector tabs
+  sel.innerHTML='<div class="etabs">'+S.emails.map(e=>{const cnt=(S.accounts[e.email]||[]).length;return`<div class="etab ${e.email===curPwdEmail?'active':''}" onclick="selectPwdEmail('${e.email}')">${esc(e.login.substring(0,10))}…${cnt>0?`<span class="ndot"></span>`:''}</div>`;}).join('')+'</div>';
+  if(!curPwdEmail||!S.emails.find(e=>e.email===curPwdEmail))curPwdEmail=S.emails[0].email;
+  renderPwdList();}
+
+function selectPwdEmail(email){curPwdEmail=email;renderPasswordsPage();}
+
+function renderPwdList(){
+  const content=document.getElementById('pwd-page-content');
+  const accs=S.accounts[curPwdEmail]||[];
+  const total=Object.values(S.accounts).reduce((a,v)=>a+(v||[]).length,0);
+  const nb=document.getElementById('pwd-count-badge');if(total>0){nb.textContent=total;nb.style.display='';}else nb.style.display='none';
+  let html=`<button class="add-pwd-btn" onclick="openAddPwd()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Добавить аккаунт</button>`;
+  if(!accs.length){html+='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><h3>Нет сохранённых паролей</h3><p>Добавь аккаунт для этой почты</p></div>';}
+  else{html+='<div class="pwd-list">'+accs.map(a=>pwdCardHTML(a)).join('')+'</div>';}
+  content.innerHTML=html;}
+
+function pwdCardHTML(a){
+  const d=new Date(a.created).toLocaleDateString('ru',{day:'numeric',month:'short',year:'numeric'});
+  return`<div class="pwd-card" id="acard-${a.id}">
+    <div class="pwd-service-row">
+      <div class="service-icon">${esc(a.emoji)}</div>
+      <div class="pwd-service-name">${esc(a.service)}</div>
+      <button class="btn sec xs" onclick="editAccount('${curPwdEmail}','${a.id}')">Изм.</button>
+      <button class="btn xs" style="background:rgba(255,59,48,.1);color:var(--red);margin-left:4px" onclick="delAccount('${curPwdEmail}','${a.id}')">✕</button>
+    </div>
+    <div class="pwd-field">
+      <span class="pwd-field-label">Логин</span>
+      <span class="pwd-field-val" id="login-${a.id}">${esc(a.login||'—')}</span>
+      ${a.login?`<button class="pwd-copy-btn" onclick="copyText('${esc(a.login)}')"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>`:''}
+    </div>
+    <div class="pwd-field">
+      <span class="pwd-field-label">Пароль</span>
+      <span class="pwd-field-val" id="pwd-val-${a.id}">${esc(a.pwd)}</span>
+      <button class="pwd-copy-btn" onclick="copyText('${esc(a.pwd)}')"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+    </div>
+    ${a.note?`<div class="pwd-note">📝 ${esc(a.note)}</div>`:''}
+    <div class="pwd-card-footer"><span class="pwd-date">Добавлен ${d}</span></div>
+  </div>`;}
+
+function togglePwdVis(id,pwd){const el=document.getElementById('pwd-val-'+id);if(el.classList.contains('hidden')){el.classList.remove('hidden');el.textContent=pwd;}else{el.classList.add('hidden');el.textContent='••••••••';}}
+
+function openEmailPasswords(email){curPwdEmail=email;document.getElementById('pwd-ov-addr').textContent=email;renderPwdOverlay();openOv('pwd-list-overlay');}
+function renderPwdOverlay(){
+  const accs=S.accounts[curPwdEmail]||[];
+  const content=document.getElementById('pwd-ov-content');
+  let html=`<button class="add-pwd-btn" onclick="openAddPwd()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Добавить аккаунт</button>`;
+  if(!accs.length)html+='<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><h3>Пока пусто</h3><p>Добавь первый аккаунт</p></div>';
+  else html+='<div class="pwd-list">'+accs.map(a=>pwdCardHTML(a)).join('')+'</div>';
+  content.innerHTML=html;}
+
+// add / edit account
+function openAddPwd(){editingAccId=null;selService={n:'Другое',e:'🌐'};updateServicePreview();document.getElementById('acc-login').value='';document.getElementById('acc-pwd').value='';document.getElementById('acc-pwd').type='password';document.getElementById('acc-note').value='';document.getElementById('add-pwd-err').style.display='none';document.getElementById('add-pwd-title').textContent='Добавить аккаунт';document.getElementById('add-pwd-sub').textContent='Сохрани логин и пароль';openM('add-pwd-modal');}
+function editAccount(email,id){const acc=(S.accounts[email]||[]).find(a=>a.id===id);if(!acc)return;editingAccId=id;curPwdEmail=email;selService={n:acc.service,e:acc.emoji};updateServicePreview();document.getElementById('acc-login').value=acc.login||'';document.getElementById('acc-pwd').value=acc.pwd;document.getElementById('acc-note').value=acc.note||'';document.getElementById('add-pwd-err').style.display='none';document.getElementById('add-pwd-title').textContent='Изменить аккаунт';document.getElementById('add-pwd-sub').textContent=acc.service;openM('add-pwd-modal');}
+function saveAccount(){const login=document.getElementById('acc-login').value.trim();const pwd=document.getElementById('acc-pwd').value;const note=document.getElementById('acc-note').value.trim();const err=document.getElementById('add-pwd-err');
+  if(!pwd){err.textContent='Введи пароль';err.style.display='';return;}
+  if(!S.accounts[curPwdEmail])S.accounts[curPwdEmail]=[];
+  if(editingAccId){const idx=S.accounts[curPwdEmail].findIndex(a=>a.id===editingAccId);if(idx>=0){S.accounts[curPwdEmail][idx]={...S.accounts[curPwdEmail][idx],service:selService.n,emoji:selService.e,login,pwd,note};}}
+  else{S.accounts[curPwdEmail].push({id:uid(),service:selService.n,emoji:selService.e,login,pwd,note,created:Date.now()});}
+  sv();closeM('add-pwd-modal');hap('success');toast(editingAccId?'✓ Обновлено':'✓ Аккаунт сохранён');
+  if(document.getElementById('pwd-list-overlay').classList.contains('open'))renderPwdOverlay();else renderPwdList();}
+function delAccount(email,id){hap('medium');S.accounts[email]=(S.accounts[email]||[]).filter(a=>a.id!==id);sv();toast('Удалено');
+  if(document.getElementById('pwd-list-overlay').classList.contains('open'))renderPwdOverlay();else renderPwdList();}
+
+// service picker
+function openServicePicker(){renderServiceGrid('');openM('service-modal');setTimeout(()=>document.getElementById('service-search').focus(),300);}
+function filterServices(){renderServiceGrid(document.getElementById('service-search').value.trim().toLowerCase());}
+function renderServiceGrid(q){
+  const custom=document.getElementById('service-search').value.trim();
+  const filtered=q?SERVICES.filter(s=>s.n.toLowerCase().includes(q)):[...SERVICES];
+  if(q&&!SERVICES.find(s=>s.n.toLowerCase()===q)&&custom)filtered.unshift({n:custom,e:'🌐',custom:true});
+  document.getElementById('service-grid').innerHTML=filtered.map(s=>`<div class="semoji ${selService.n===s.n?'active':''}" onclick="pickService('${esc(s.n)}','${esc(s.e)}')" title="${esc(s.n)}">${esc(s.e)}<div style="font-size:9px;color:var(--hint);margin-top:2px;text-align:center;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.n.substring(0,6))}</div></div>`).join('');}
+function pickService(n,e){selService={n,e};updateServicePreview();closeM('service-modal');}
+function updateServicePreview(){document.getElementById('service-emoji-preview').textContent=selService.e;const sp=document.getElementById('service-name-preview');sp.textContent=selService.n;sp.style.color=selService.n==='Выбери или введи название'?'var(--hint)':'var(--text)';}
+
+// ── INBOX ────────────────────────────────────────────────────────────────
+function renderInbox(){const tw=document.getElementById('etabs-wrap'),cont=document.getElementById('inbox-content'),al=document.getElementById('inbox-addr'),ab=document.getElementById('auto-bar');
+  if(!S.emails.length||!S.active){tw.style.display='none';ab.style.display='none';al.textContent='Нет активной почты';cont.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><h3>Нет активной почты</h3><p>Создай почту во вкладке «Почты»</p></div>';return;}
+  al.textContent=S.active;ab.style.display=S.settings.auto?'':'none';
+  if(S.emails.length>1){tw.style.display='';document.getElementById('etabs').innerHTML=S.emails.map(e=>{const msgs=S.messages[e.email]||[];const seen=S.seen[e.email]||[];const nc=msgs.filter(m=>!seen.includes(m.id)).length;return`<div class="etab ${e.email===S.active?'active':''}" onclick="switchInbox('${e.email}')">${esc(e.login.substring(0,9))}…${nc?'<span class="ndot"></span>':''}</div>`;}).join('');}else tw.style.display='none';
+  const entry=S.emails.find(e=>e.email===S.active);
+  if(entry?.pwd&&!S.unlocked[S.active]){cont.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><h3>Почта защищена</h3><p>Введи пароль чтобы открыть</p><button class="btn" style="margin-top:16px;max-width:200px" onclick="unlockInbox('${S.active}')">Разблокировать</button></div>`;return;}
+  const msgs=S.messages[S.active]||[];
+  if(!msgs.length){cont.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><h3>Входящие пусты</h3><p>Зарегистрируйся на сайте и жди письмо</p></div>';return;}
+  cont.innerHTML='<div class="msg-list">'+msgs.map(m=>{const from=m.from||'?';const color=COLORS[from.charCodeAt(0)%COLORS.length];return`<div class="msg-item" onclick="openMsg('${S.active}',${m.id})"><div class="msg-av" style="background:${color}">${esc(from[0].toUpperCase())}</div><div class="msg-info"><div class="msg-from">${esc(from)}</div><div class="msg-subj">${esc(m.subject||'(без темы)')}</div><div class="msg-date">${esc(m.date||'')}</div></div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--hint)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>`;}).join('')+'</div>';
+  const total=Object.entries(S.messages).reduce((a,[em,ms])=>a+ms.filter(m=>!(S.seen[em]||[]).includes(m.id)).length,0);const nb=document.getElementById('inbox-badge');if(total>0){nb.textContent=total;nb.style.display='';}else nb.style.display='none';}
+
+function unlockInbox(email){pendUnlock=email;document.getElementById('unlock-inp').value='';document.getElementById('unlock-err').style.display='none';openM('unlock-modal');}
+function switchInbox(email){const entry=S.emails.find(e=>e.email===email);if(entry?.pwd&&!S.unlocked[email]){unlockInbox(email);return;}S.active=email;sv();hap('light');renderInbox();}
+
+async function refreshInbox(){if(!S.active)return;hap('light');const entry=S.emails.find(e=>e.email===S.active);if(!entry)return;
+  const data=await api(`https://www.1secmail.com/api/v1/?action=getMessages&login=${entry.login}&domain=${entry.domain}`);
+  if(!data){toast('Ошибка подключения');return;}
+  const prev=S.seen[S.active]||[];const nw=data.filter(m=>!prev.includes(m.id));
+  S.messages[S.active]=data;if(nw.length&&S.settings.notify){hap('success');toast(`📬 ${nw.length} новых писем!`);}sv();renderInbox();}
+
+async function openMsg(email,id){hap('light');const entry=S.emails.find(e=>e.email===email);if(!entry)return;
+  document.getElementById('det-subj').textContent='Загрузка…';document.getElementById('det-meta').textContent='';document.getElementById('det-body').textContent='';openOv('msg-overlay');
+  const msg=await api(`https://www.1secmail.com/api/v1/?action=readMessage&login=${entry.login}&domain=${entry.domain}&id=${id}`);
+  if(!msg){document.getElementById('det-subj').textContent='Ошибка';return;}
+  if(!S.seen[email])S.seen[email]=[];if(!S.seen[email].includes(id))S.seen[email].push(id);sv();
+  document.getElementById('det-subj').textContent=msg.subject||'(без темы)';
+  document.getElementById('det-meta').innerHTML=`От: ${esc(msg.from||'?')}<br>Дата: ${esc(msg.date||'')}`;
+  const body=msg.textBody||msg.body||'(пустое письмо)';document.getElementById('det-body').textContent=body.length>4000?body.substring(0,4000)+'…':body;
+  renderInbox();}
+
+// ── HISTORY ──────────────────────────────────────────────────────────────
+function renderHistory(){const wrap=document.getElementById('history-list');
+  if(!S.history.length){wrap.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><h3>История пуста</h3></div>';return;}
+  wrap.innerHTML='<div class="card">'+S.history.map(h=>`<div class="hist-row"><div style="flex:1;min-width:0"><div class="hist-addr">${esc(h.email)}</div><div class="hist-date">${new Date(h.created).toLocaleString('ru')}</div></div><button class="btn sec sm" onclick="copyAddr('${h.email}')">Копировать</button></div>`).join('')+'</div>';}
+function clearHistory(){S.history=[];sv();renderHistory();toast('История очищена');hap('medium');}
+
+// ── SETTINGS ─────────────────────────────────────────────────────────────
+function renderSettings(){['notify','auto','haptic','history'].forEach(k=>{const el=document.getElementById('t-'+k);if(el)el.className='toggle'+(S.settings[k]?' on':'');});
+  const hp=!!S.pin;document.getElementById('pin-st').textContent=hp?'4-значный PIN установлен':'Не установлен';
+  const ab=document.getElementById('pin-act-btn');ab.textContent=hp?'Снять':'Установить';ab.onclick=hp?removePIN:openPinSetup;
+  document.getElementById('chg-pin-row').style.display=hp?'':'none';}
+function removePIN(){S.pin=null;sv();renderSettings();toast('PIN снят');}
+function tog(k){S.settings[k]=!S.settings[k];hap('light');sv();renderSettings();if(k==='auto')S.settings.auto?startAuto():stopAuto();}
+function nukeAll(){hap('medium');S={emails:[],active:null,messages:{},seen:{},unlocked:{},accounts:{},history:[],pin:null,settings:{notify:true,auto:true,haptic:true,history:true}};sv();renderAll();toast('Всё удалено');}
+
+// ── AUTO REFRESH ──────────────────────────────────────────────────────────
+let autoInt,cd=15;
+function startAuto(){stopAuto();cd=15;autoInt=setInterval(()=>{cd--;const el=document.getElementById('auto-cd');if(el)el.textContent=cd+'с';if(cd<=0){cd=15;refreshInbox();}},1000);}
+function stopAuto(){clearInterval(autoInt);}
+
+initPin();
+</script>
+</body>
+</html>
